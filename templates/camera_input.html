@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ScanSpeak</title>
+    <!--<link rel="stylesheet" href="C:/Users/shravan/Desktop/NIE/4th sem/project_not_working/projectUsingCamera/style.css">
+    -->
+    <style>
+        body {
+            background-color: #070707;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            color: #a8dfec;
+        }
+        
+        #container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        h1 {
+            color: #1ab0d5;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        
+        #video {
+        
+            border: 2px solid #1ab0d5;
+            border-radius: 10px;
+        }
+        
+        h4 {
+            color: #0faed2;
+            font-size: 1.5rem;
+            margin-top: 20px;
+        }
+        
+        #output {
+            color: #a8dfec;
+            width: 100%;
+            height: 200px;
+            margin-top: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid #1ab0d5;
+            border-radius: 10px;
+            padding: 10px;
+            resize: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>ScanSpeak</h1>
+        <video id="video" width="800" height="480" autoplay></video>
+
+        <h4>OUTPUT:</h4>
+        <textarea id="output" rows="10" cols="50" readonly></textarea>
+    </div>
+
+    <script>
+        const video = document.getElementById("video");
+        const output = document.getElementById("output");
+        
+        // Access the camera and stream video
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => {
+                console.error('Error accessing the camera:', err);
+            });
+
+        // Wait for the video to start playing before capturing frames
+        video.addEventListener('playing', function() {
+        captureAndRecognize();
+        });
+        
+        const frameCaptureInterval = 2500; // Capture a frame every 1000 milliseconds (1 second)
+        let lastRecognizedText = "";
+        let lastRecognizedTime = Date.now();
+
+function captureAndRecognize() {
+    const canvas = document.createElement("canvas");
+    canvas.width = video.width;
+    canvas.height = video.height;
+    const ctx = canvas.getContext('2d');
+
+    // Capture a frame from the video
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert the frame to an image data URL
+    const imageData = canvas.toDataURL('image/png');
+
+    // Send the image data to the server for OCR
+    fetch('/perform_ocr', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ image_data: imageData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const recognizedText = data.output;
+
+        // Check if recognized text has changed before speaking
+        if (recognizedText !== lastRecognizedText) {
+            output.value = recognizedText;
+            speakRecognition(recognizedText);
+            lastRecognizedText = recognizedText;
+        }
+
+        lastRecognizedTime = Date.now();
+    })
+    .catch((err) => {
+        console.error('Error sending image data:', err);
+
+        // Check if it's been more than a specific interval since the last recognition
+        // const currentTime = Date.now();
+        // const timeSinceLastRecognized = currentTime - lastRecognizedTime;
+
+        // // If it's been more than 7000 milliseconds (7 seconds), set the output to "Unrecognized"
+        // if (timeSinceLastRecognized > 4000) {
+        //     // output.value = "Unrecognized";
+        //     speakRecognition("Unrecognised");
+        // }
+    });
+
+    // Continue capturing frames with a delay
+    setTimeout(captureAndRecognize, frameCaptureInterval);
+}
+        
+// Start the continuous frame capture and OCR process
+captureAndRecognize();
+
+//speak out "recognised" if a text is successfully detected
+function speakRecognition(text) {
+     const recognition = new SpeechSynthesisUtterance("Recognized");
+     recognition.onend = function() {
+                const textToSpeak = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.speak(textToSpeak);
+        };
+    window.speechSynthesis.speak(recognition);       
+    }
+       
+        // function speakRecognition(text) {
+        //     const recognition = new SpeechSynthesisUtterance(text);
+        //     window.speechSynthesis.speak(recognition);
+        // }
+    </script>
+</body>
+</html>
+
+
+
+
